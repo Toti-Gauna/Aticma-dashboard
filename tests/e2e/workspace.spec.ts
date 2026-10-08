@@ -2,9 +2,11 @@ import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { freshWorkspace } from '../../src/lib/model';
 import { STORAGE_KEY } from '../../src/lib/storage';
+import { lessons } from '../../src/lib/program';
 
 test('respuestas, preguntas propias y progreso persisten al recargar', async ({ page }) => {
   await page.goto('./#sessions/01');
+  await page.getByRole('button', { name: /Para reflexionar/ }).click();
   const answer = page.getByLabel('Respuesta a ¿Qué problema concreto resolvemos y para quién?');
   await answer.fill('El especialista pierde tiempo coordinando por canales separados.');
   await page.getByRole('button', { name: 'Marcar completada' }).click();
@@ -22,6 +24,7 @@ test('respuestas, preguntas propias y progreso persisten al recargar', async ({ 
     )
     .toBe(1);
   await page.reload();
+  await page.getByRole('button', { name: /Para reflexionar/ }).click();
   await expect(answer).toHaveValue(
     'El especialista pierde tiempo coordinando por canales separados.',
   );
@@ -33,6 +36,87 @@ test('respuestas, preguntas propias y progreso persisten al recargar', async ({ 
   await expect(page.getByLabel('Resultado esperado')).toHaveValue(
     'El especialista pierde tiempo coordinando por canales separados.',
   );
+});
+
+test('preguntas hipotéticas del speaker, respuestas y preguntas propias se conservan y exportan', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('./#sessions/02');
+  await expect(page.getByRole('button', { name: /Para el speaker/ })).toBeVisible();
+  const prompt = lessons[1].speakerQuestions[0].prompt;
+  const answer = page.getByLabel(`Respuesta a ${prompt}`);
+  await answer.fill('Comparar frecuencia de uso y valor antes de elegir el modelo.');
+  await expect(page.getByRole('button', { name: /Para el speaker/ })).toHaveText(
+    'Para el speaker1/6',
+  );
+  await page.getByRole('button', { name: `Copiar pregunta: ${prompt}`, exact: true }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(prompt);
+  await page.getByRole('button', { name: 'Agregar mi propia pregunta' }).click();
+  await expect(page.getByLabel('Tipo de pregunta', { exact: true })).toHaveValue('speaker');
+  await page
+    .getByLabel('Pregunta', { exact: true })
+    .fill('Si el precio cambiara, ¿cómo lo probarías?');
+  await page.getByRole('button', { name: 'Agregar pregunta', exact: true }).click();
+  await page
+    .getByLabel('Respuesta a Si el precio cambiara, ¿cómo lo probarías?')
+    .fill('Con una prueba acotada.');
+  await page.getByRole('button', { name: /Para reflexionar/ }).click();
+  await expect(page.getByRole('heading', { name: prompt })).toHaveCount(0);
+  await page
+    .getByLabel('Respuesta a ¿Qué valor recibe cada segmento de clientes?')
+    .fill('Una reflexión separada.');
+  await page.reload();
+  await expect(answer).toHaveValue('Comparar frecuencia de uso y valor antes de elegir el modelo.');
+  await expect(
+    page.getByLabel('Respuesta a Si el precio cambiara, ¿cómo lo probarías?'),
+  ).toHaveValue('Con una prueba acotada.');
+  await page.getByRole('button', { name: 'Convertir en acción' }).first().click();
+  await expect(page.getByLabel('Resultado esperado')).toHaveValue(
+    'Comparar frecuencia de uso y valor antes de elegir el modelo.',
+  );
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancelar' }).click();
+  const downloaded = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Exportar cuaderno' }).click();
+  const file = await downloaded;
+  const markdown = await readFile((await file.path())!, 'utf8');
+  expect(markdown).toContain('### Para el speaker · casos hipotéticos');
+  expect(markdown).toContain('Comparar frecuencia de uso y valor antes de elegir el modelo.');
+  expect(markdown).toContain('Con una prueba acotada.');
+  expect(markdown).toContain('Una reflexión separada.');
+});
+
+test('la pantalla de carga aparece al abrir y refrescar, espera a la página y no se repite al navegar', async ({
+  page,
+}) => {
+  let releaseLesson!: () => void;
+  const lessonGate = new Promise<void>((resolve) => {
+    releaseLesson = resolve;
+  });
+  await page.route('**/src/pages/Sessions.tsx*', async (route) => {
+    await lessonGate;
+    await route.continue();
+  });
+  await page.goto('./#sessions/01', { waitUntil: 'domcontentloaded' });
+  const loader = page.getByRole('status', { name: 'Cargando workspace' });
+  await expect(loader).toBeVisible();
+  await expect(page.locator('.workspace-shell')).toHaveAttribute('inert', '');
+  const mountedAt = await page.evaluate(() => performance.now());
+  await expect.poll(() => page.evaluate(() => performance.now())).toBeGreaterThan(mountedAt + 1300);
+  await expect(loader).toBeVisible();
+  releaseLesson();
+  await expect(loader).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Tus masterclasses' })).toBeVisible();
+  await expect(page.locator('.workspace-shell')).not.toHaveAttribute('inert', '');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(loader).toBeVisible();
+  await expect(loader).toHaveCount(0);
+  await page.evaluate(() => {
+    location.hash = 'notes';
+  });
+  await expect(page.getByRole('heading', { name: 'Tu cuaderno' })).toBeVisible();
+  await expect(loader).toHaveCount(0);
 });
 
 test('notas y pizarra guardan trazos; deshacer, rehacer y exportar funcionan', async ({ page }) => {
@@ -116,7 +200,7 @@ test('crear, editar, completar y filtrar una acción', async ({ page }) => {
         (key) =>
           JSON.parse(localStorage.getItem(key)!).actions.find(
             (a: { title: string }) => a.title === 'Diseñar un experimento de captación',
-          ).status,
+          )?.status,
         STORAGE_KEY,
       ),
     )
@@ -199,8 +283,9 @@ test('importación revisable restaura datos y rechaza archivos inválidos', asyn
   });
   await expect(page.getByRole('alert')).toContainText('No pudimos importar');
   await page.goto('./#sessions/02');
+  await page.getByRole('button', { name: /Para reflexionar/ }).click();
   await expect(
-    page.getByLabel('Respuesta a ¿Qué valor recibe el usuario y qué valor recibe el especialista?'),
+    page.getByLabel('Respuesta a ¿Qué valor recibe cada segmento de clientes?'),
   ).toHaveValue('Respuesta desde otro navegador');
 });
 
@@ -223,7 +308,7 @@ test('navegación, diálogos por teclado y vistas responsivas sin desborde', asy
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('./');
-  await page.getByRole('heading', { name: /Las ideas/ }).waitFor();
+  await expect(page.locator('.workspace-shell')).not.toHaveAttribute('inert', '');
   await page.keyboard.press('Control+k');
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('textbox', { name: 'Buscar en el workspace' }).fill('Finanzas');
@@ -246,6 +331,7 @@ test('navegación, diálogos por teclado y vistas responsivas sin desborde', asy
     'settings',
   ]) {
     await page.goto(`./#${route}`);
+    await expect(page.locator('.workspace-shell')).not.toHaveAttribute('inert', '');
     await page.locator('.page-content').waitFor();
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
@@ -274,6 +360,7 @@ test('widgets configurables y herramientas conservan el trabajo', async ({ page 
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Construí con evidencia' })).toHaveCount(0);
   await page.goto('./#tools');
+  await expect(page.locator('.workspace-shell')).not.toHaveAttribute('inert', '');
   await page
     .getByLabel('Propuesta de valor', { exact: true })
     .fill('Coordinación clara para ambos lados.');
@@ -306,6 +393,7 @@ test('dos pestañas no sobrescriben en silencio el trabajo en memoria', async ({
   context,
 }) => {
   await page.goto('./#sessions/01');
+  await page.getByRole('button', { name: /Para reflexionar/ }).click();
   const answer = page.getByLabel('Respuesta a ¿Qué problema concreto resolvemos y para quién?');
   await answer.fill('Versión A');
   await expect
@@ -315,6 +403,7 @@ test('dos pestañas no sobrescriben en silencio el trabajo en memoria', async ({
     .toBe('Versión A');
   const other = await context.newPage();
   await other.goto('http://127.0.0.1:5173/Aticma-dashboard/#sessions/01');
+  await other.getByRole('button', { name: /Para reflexionar/ }).click();
   await other
     .getByLabel('Respuesta a ¿Qué problema concreto resolvemos y para quién?')
     .fill('Versión B');

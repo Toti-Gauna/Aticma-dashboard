@@ -11,6 +11,7 @@ import {
   MessageCircle,
   Download,
   Target,
+  Copy,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { lessons } from '../lib/program';
@@ -18,24 +19,37 @@ import { useWorkspace } from '../lib/workspace';
 import { uid, nowISO } from '../lib/model';
 import { dateLabel, endTime } from '../lib/dates';
 import { download, workspaceMarkdown } from '../lib/export';
-import { Button, Pill, PageHeader, Modal, Panel } from '../components/ui';
+import { Button, IconButton, Pill, PageHeader, Modal, Panel } from '../components/ui';
 import { ActionForm } from '../components/ActionForm';
 
 export default function Sessions() {
   const { state, setState, focusId, navigate, notify } = useWorkspace();
   const lesson = lessons.find((l) => l.id === focusId) || lessons[0];
   const [tab, setTab] = useState('Preguntas'),
+    [audience, setAudience] = useState<'speaker' | 'reflection'>('speaker'),
+    [customAudience, setCustomAudience] = useState<'speaker' | 'reflection'>('speaker'),
     [action, setAction] = useState(false),
     [question, setQuestion] = useState(false),
     [prompt, setPrompt] = useState(''),
     [actionSeed, setActionSeed] = useState({ title: '', description: '' });
-  const questions = [
-    ...lesson.questions,
-    ...state.questions
-      .filter((q) => q.lessonId === lesson.id)
-      .map((q) => ({ ...q, hint: 'Pregunta que agregaste para esta sesión.' })),
+  const customQuestions = state.questions.filter((q) => q.lessonId === lesson.id);
+  const speakerQuestions = [
+    ...lesson.speakerQuestions,
+    ...customQuestions
+      .filter((q) => q.audience === 'speaker')
+      .map((q) => ({ ...q, hint: 'Tu pregunta para hacer durante el encuentro.' })),
   ];
-  const answered = questions.filter((q) => state.answers[q.id]?.trim()).length;
+  const reflectionQuestions = [
+    ...lesson.questions,
+    ...customQuestions
+      .filter((q) => q.audience !== 'speaker')
+      .map((q) => ({ ...q, hint: 'Tu pregunta para reflexionar sobre esta sesión.' })),
+  ];
+  const questions = audience === 'speaker' ? speakerQuestions : reflectionQuestions;
+  const allQuestions = [...speakerQuestions, ...reflectionQuestions];
+  const answeredCount = (qs: typeof questions) =>
+    qs.filter((q) => state.answers[q.id]?.trim()).length;
+  const answered = answeredCount(allQuestions);
   const complete = state.completedLessons.includes(lesson.id);
   const createNote = () => {
     const id = uid();
@@ -61,7 +75,7 @@ export default function Sessions() {
       <PageHeader
         eyebrow="APRENDER PARA CONSTRUIR"
         title="Tus masterclasses"
-        description="Cada encuentro, una nueva perspectiva para Handy."
+        description="Cada encuentro, una nueva perspectiva para tu proyecto."
       >
         <Button onClick={() => download(workspaceMarkdown(state), 'aticma-cuaderno.md')}>
           <Download size={16} />
@@ -162,7 +176,7 @@ export default function Sessions() {
           <div className="session-objective">
             <Target size={20} />
             <div>
-              <h3>Lo que te llevás a Handy</h3>
+              <h3>Lo que te llevás del encuentro</h3>
               <p>{lesson.objective}</p>
               <span>{lesson.deliverable}</span>
             </div>
@@ -186,7 +200,7 @@ export default function Sessions() {
                 {t}
                 {t === 'Preguntas' && (
                   <span>
-                    {answered}/{questions.length}
+                    {answered}/{allQuestions.length}
                   </span>
                 )}
               </button>
@@ -194,16 +208,57 @@ export default function Sessions() {
           </div>
           {tab === 'Preguntas' && (
             <div className="question-list" role="tabpanel">
+              <div className="question-groups" role="group" aria-label="Tipo de preguntas">
+                <button
+                  className={audience === 'speaker' ? 'active' : ''}
+                  aria-pressed={audience === 'speaker'}
+                  onClick={() => setAudience('speaker')}
+                >
+                  <MessageCircle size={15} />
+                  Para el speaker
+                  <span>
+                    {answeredCount(speakerQuestions)}/{speakerQuestions.length}
+                  </span>
+                </button>
+                <button
+                  className={audience === 'reflection' ? 'active' : ''}
+                  aria-pressed={audience === 'reflection'}
+                  onClick={() => setAudience('reflection')}
+                >
+                  <NotebookPen size={15} />
+                  Para reflexionar
+                  <span>
+                    {answeredCount(reflectionQuestions)}/{reflectionQuestions.length}
+                  </span>
+                </button>
+              </div>
               <div className="question-intro">
-                <p>Preguntas para llevar a la sesión y pensar después.</p>
+                <p>
+                  {audience === 'speaker'
+                    ? 'Casos hipotéticos para consultar, sin nombres ni detalles del proyecto. Anotá la respuesta del speaker debajo.'
+                    : 'Conectá lo aprendido con tus decisiones. Tus respuestas anteriores siguen acá.'}
+                </p>
                 <span>Guardado automático</span>
               </div>
               {questions.map((q, i) => (
-                <article className="question" key={q.id}>
+                <article className="question" key={q.id} aria-labelledby={`question-${q.id}`}>
                   <div className="question-title">
                     <span>{String(i + 1).padStart(2, '0')}</span>
-                    <h3>{q.prompt}</h3>
+                    <h3 id={`question-${q.id}`}>{q.prompt}</h3>
                     {state.answers[q.id]?.trim() && <Check size={16} className="lime" />}
+                    <IconButton
+                      label={`Copiar pregunta: ${q.prompt}`}
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(q.prompt);
+                          notify('Pregunta copiada');
+                        } catch {
+                          notify('No se pudo copiar. Podés seleccionar el texto de la pregunta.');
+                        }
+                      }}
+                    >
+                      <Copy size={14} />
+                    </IconButton>
                   </div>
                   <p>{q.hint}</p>
                   <label className="sr-only" htmlFor={`answer-${q.id}`}>
@@ -217,7 +272,11 @@ export default function Sessions() {
                       setState((s) => ({ ...s, answers: { ...s.answers, [q.id]: e.target.value } }))
                     }
                     rows={3}
-                    placeholder="Tu respuesta, lo que aprendiste, lo que querés preguntar…"
+                    placeholder={
+                      audience === 'speaker'
+                        ? 'La respuesta del speaker, sus ejemplos y lo que querés repreguntar…'
+                        : 'Tu reflexión, lo que aprendiste y la decisión que querés tomar…'
+                    }
                   />
                   <div className="question-footer">
                     <span>{state.answers[q.id]?.length || 0} caracteres</span>
@@ -236,7 +295,13 @@ export default function Sessions() {
                   </div>
                 </article>
               ))}
-              <Button className="full-width add-dashed" onClick={() => setQuestion(true)}>
+              <Button
+                className="full-width add-dashed"
+                onClick={() => {
+                  setCustomAudience(audience);
+                  setQuestion(true);
+                }}
+              >
                 <Plus size={16} />
                 Agregar mi propia pregunta
               </Button>
@@ -321,13 +386,30 @@ export default function Sessions() {
               ...s,
               questions: [
                 ...s.questions,
-                { id: uid(), lessonId: lesson.id, prompt: prompt.trim() },
+                {
+                  id: uid(),
+                  lessonId: lesson.id,
+                  prompt: prompt.trim(),
+                  audience: customAudience,
+                },
               ],
             }));
             setPrompt('');
+            setAudience(customAudience);
             setQuestion(false);
           }}
         >
+          <label>
+            Tipo de pregunta
+            <select
+              aria-label="Tipo de pregunta"
+              value={customAudience}
+              onChange={(e) => setCustomAudience(e.target.value as 'speaker' | 'reflection')}
+            >
+              <option value="speaker">Para el speaker</option>
+              <option value="reflection">Para reflexionar</option>
+            </select>
+          </label>
           <label>
             Pregunta
             <textarea

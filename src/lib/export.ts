@@ -99,8 +99,24 @@ export function workspaceMarkdown(state: Workspace) {
     '# ATICMA × Handy · Cuaderno de trabajo',
     `Exportado: ${new Date().toLocaleString('es-AR')}`,
     ...lessons.map((l) => {
-      const qs = [...l.questions, ...state.questions.filter((q) => q.lessonId === l.id)];
-      return `## ${l.id} · ${l.title}\n${l.date} · ${l.speaker}\n\n${qs.map((q) => `### ${q.prompt}\n${state.answers[q.id] || '_Sin respuesta_'}\n`).join('\n')}`;
+      const custom = state.questions.filter((q) => q.lessonId === l.id);
+      const groups = [
+        {
+          title: 'Para el speaker · casos hipotéticos',
+          questions: [...l.speakerQuestions, ...custom.filter((q) => q.audience === 'speaker')],
+        },
+        {
+          title: 'Para reflexionar',
+          questions: [...l.questions, ...custom.filter((q) => q.audience !== 'speaker')],
+        },
+      ];
+      return [
+        `## ${l.id} · ${l.title}\n${l.date} · ${l.speaker}`,
+        ...groups.map(
+          (group) =>
+            `### ${group.title}\n\n${group.questions.map((q) => `#### ${q.prompt}\n${state.answers[q.id] || '_Sin respuesta_'}\n`).join('\n')}`,
+        ),
+      ].join('\n\n');
     }),
     '## Notas',
     ...state.notes.map((n) => `### ${n.title}\n${n.body}\n`),
