@@ -200,7 +200,7 @@ test('crear, editar, completar y filtrar una acción', async ({ page }) => {
         (key) =>
           JSON.parse(localStorage.getItem(key)!).actions.find(
             (a: { title: string }) => a.title === 'Diseñar un experimento de captación',
-          ).status,
+          )?.status,
         STORAGE_KEY,
       ),
     )
