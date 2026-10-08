@@ -18,4 +18,6 @@ La lámina general resume los encuentros como dos horas; se prioriza la lámina 
 
 Semifinal y final se exportan como eventos de día completo para no inventar una hora. La vista del programa no asume selección para la final ni asistencia a una masterclass.
 
-Objetivos, entregables y preguntas son contenido editorial preparado para aplicar las lecciones a Handy. Se pueden agregar preguntas y responder después de cada encuentro; no se precargan respuestas ni resultados de estudios.
+Objetivos, entregables y preguntas son contenido editorial. Cada lección separa seis **preguntas para el speaker**, redactadas como casos hipotéticos sin nombrar el producto ni describir su funcionamiento, de cinco **preguntas para reflexionar**. Las primeras incluyen posibles repreguntas y espacio para registrar lo que respondió la persona; las segundas conectan el aprendizaje con decisiones propias. También se neutralizaron las referencias al producto en las reflexiones, manteniendo sus identificadores para conservar las respuestas existentes.
+
+Se pueden copiar preguntas, agregar preguntas propias a cualquiera de las dos vistas y convertir una respuesta en acción. El cuaderno Markdown exporta ambas vistas con sus respuestas; el respaldo JSON conserva los datos anteriores, incluyendo preguntas propias que no tenían destinatario (se muestran en reflexión). No se precargan respuestas atribuidas a los speakers ni resultados de estudios.

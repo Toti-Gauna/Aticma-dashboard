@@ -3,13 +3,13 @@
 Espacio de trabajo para registrar experiencias y estudios de **ATICMA Emprende 2026** y convertirlos en decisiones para Handy.
 
 - Dashboard con widgets configurables y progreso real de tu cuaderno.
-- Seis masterclasses con agenda, speakers, 30 preguntas editoriales y respuestas debajo; permite agregar preguntas propias y convertir una respuesta en acción.
+- Seis masterclasses con agenda, speakers, 36 preguntas hipotéticas para hacer durante el encuentro y 30 preguntas de reflexión, en vistas separadas. Ninguna pregunta editorial nombra el producto. Cada pregunta tiene su respuesta debajo, se puede copiar y convertir en acción; las preguntas propias permiten elegir el destinatario.
 - Calendario navegable, eventos personales, vencimientos de acciones y exportación ICS en horario de Argentina.
 - Notas vinculadas a sesiones y pizarra SVG: dibujo, rectángulos, flechas, texto, selección, movimiento, color, zoom, deshacer, rehacer y exportación vectorial.
 - Acciones por área, prioridad, fecha, responsable y estado; tablero, lista y arrastre entre columnas.
 - Estudios, investigaciones y experiencias con método, evidencia, fuente y conclusión.
 - Canvas de negocio, calculadora de escenarios y cronómetro de pitch con guion exportable.
-- Motion para transiciones y un gráfico SVG animado; respeta la preferencia de reducir movimiento. Componentes propios con controles HTML nativos, diseño responsive, navegación por teclado y buscador `Ctrl/⌘ K`.
+- Pantalla de carga con gráficos SVG y Motion al abrir la app y en cada refresh, hasta que la primera pantalla está lista, con una presencia mínima de 1,1 segundos y salida breve. La navegación interna conserva transiciones ligeras. Respeta la preferencia de reducir movimiento. Componentes propios con controles HTML nativos, diseño responsive, navegación por teclado y buscador `Ctrl/⌘ K`.
 
 ## Desarrollo
 

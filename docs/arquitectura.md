@@ -6,6 +6,8 @@ Aplicación estática React 19 + TypeScript + Vite. Motion anima las transicione
 
 `src/lib/program.ts` contiene el calendario editorial y las preguntas. `model.ts` define el esquema versionado de Zod y los tipos derivados. `storage.ts` encapsula lectura, escritura y validación de respaldos. `workspace.tsx` maneja navegación, datos, notificaciones y guardado. Las pantallas están en `src/pages`; componentes comunes, modal, formularios y pizarra en `src/components`.
 
+`StartupScreen.tsx` muestra una apertura SVG animada en cada carga del documento, también al refrescar o abrir un enlace a una sección. `App.tsx` espera tanto un mínimo de 1,1 segundos como el montaje de la primera página dentro de `Suspense`; el contenido se prepara detrás de la apertura y queda inerte hasta terminar la transición. No se guarda una bandera de apertura en el navegador ni se muestran porcentajes de carga ficticios. La navegación entre secciones no reinicia esta pantalla. Se limpia el temporizador y se restaura el scroll; la preferencia de movimiento reducido desactiva el giro y el dibujo animado.
+
 ## Modelo de datos v1
 
 | Registro      | Campos principales                                             | Relación                    |

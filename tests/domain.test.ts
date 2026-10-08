@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { freshWorkspace, workspaceSchema } from '../src/lib/model';
-import { calendarICS } from '../src/lib/export';
+import { calendarICS, workspaceMarkdown } from '../src/lib/export';
 import { endTime, monthCells } from '../src/lib/dates';
-import { lessons } from '../src/lib/program';
+import { lessons, allQuestions } from '../src/lib/program';
 import { readWorkspace, writeWorkspace, parseBackup, STORAGE_KEY } from '../src/lib/storage';
 import { economics } from '../src/pages/Tools';
 
@@ -158,6 +158,41 @@ describe('Calendario oficial y exportación', () => {
     expect(cells[0].date).toBe('2026-09-28');
     expect(cells).toHaveLength(42);
     expect(monthCells(2027, 0)[0].date).toBe('2026-12-28');
+  });
+});
+describe('Preguntas para el speaker y compatibilidad del cuaderno', () => {
+  it('ofrece casos hipotéticos por lección sin nombrar el producto en las preguntas ni sus ayudas', () => {
+    expect(lessons.every((lesson) => lesson.speakerQuestions.length === 6)).toBe(true);
+    expect(allQuestions).toHaveLength(66);
+    expect(new Set(allQuestions.map((q) => q.id)).size).toBe(allQuestions.length);
+    for (const q of allQuestions) expect(`${q.prompt} ${q.hint}`).not.toMatch(/handy/i);
+    for (const lesson of lessons)
+      for (const q of lesson.speakerQuestions) expect(q.prompt).toMatch(/^Si /);
+  });
+  it('conserva respaldos anteriores y exporta las respuestas en el grupo correcto', () => {
+    const previous = freshWorkspace();
+    previous.answers['01-5'] = 'Una decisión anterior que debe conservarse.';
+    previous.questions.push({ id: 'old-custom', lessonId: '01', prompt: 'Mi pregunta anterior' });
+    previous.answers['old-custom'] = 'Mi reflexión anterior';
+    const state = parseBackup(JSON.stringify(previous));
+    expect(state.questions[0].audience).toBeUndefined();
+    state.answers['01-speaker-1'] = 'Respuesta registrada del speaker';
+    state.questions.push({
+      id: 'new-custom',
+      lessonId: '01',
+      prompt: 'Si fuera un caso nuevo, ¿qué observarías?',
+      audience: 'speaker',
+    });
+    state.answers['new-custom'] = 'Otra respuesta del speaker';
+    expect(parseBackup(JSON.stringify(state))).toEqual(state);
+    const lesson = workspaceMarkdown(state).split('## 02 ·')[0];
+    const [speaker, reflection] = lesson.split('### Para reflexionar');
+    expect(speaker).toContain('Respuesta registrada del speaker');
+    expect(speaker).toContain('Otra respuesta del speaker');
+    expect(speaker).not.toContain('Mi reflexión anterior');
+    expect(reflection).toContain('Una decisión anterior que debe conservarse.');
+    expect(reflection).toContain('Mi reflexión anterior');
+    expect(reflection).not.toContain('Respuesta registrada del speaker');
   });
 });
 describe('Escenarios económicos', () => {

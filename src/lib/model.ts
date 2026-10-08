@@ -73,7 +73,16 @@ export const workspaceSchema = z
       .array(lessonId)
       .max(6)
       .refine((v) => new Set(v).size === v.length),
-    questions: z.array(z.object({ id, lessonId, prompt: z.string().min(1).max(500) })).max(300),
+    questions: z
+      .array(
+        z.object({
+          id,
+          lessonId,
+          prompt: z.string().min(1).max(500),
+          audience: z.enum(['speaker', 'reflection']).optional(),
+        }),
+      )
+      .max(300),
     widgetOrder: z
       .array(z.enum(widgets))
       .length(4)
